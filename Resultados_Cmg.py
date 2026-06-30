@@ -27,7 +27,7 @@ columnas_numericas = [
 # 2. Cargar y procesar datos multi-año con caché
 @st.cache_data
 def load_data_multiaño():
-    ruta_archivo = r"C:\Users\bryan\Southenergy Spa Dropbox\Project Activos PV\20 - Análisis\Análisis centrales\Resultados\BD Centrales.xlsx"
+    ruta_archivo = "BD Centrales.xlsx"
     años = [2023, 2024, 2025]
     dfs_años = []
     
