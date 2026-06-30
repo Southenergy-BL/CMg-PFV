@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando Mapas de Calor de Correspondencia CEN...
+python -m streamlit run Resultados_Cmg.py --server.maxMessageSize 300
