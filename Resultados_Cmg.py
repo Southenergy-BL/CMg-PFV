@@ -269,8 +269,8 @@ with st.expander("Ver Análisis de Almacenamiento (Basado en Vertimientos Anuale
         # CASO B: Todas las Centrales (Ranking)
         else:
             # Inyectar para diagnóstico visual temporal
-            st.write("🔍 DEBUG - Estado de los datos antes del dropna:")
-            st.dataframe(df_bess[['Nombre Central Infotécnica', 'Vertimientos [GWh]', 'Spread Día-Noche', 'Upside_Económico_Anual_USD']].head(10))
+            #st.write("🔍 DEBUG - Estado de los datos antes del dropna:")
+            #st.dataframe(df_bess[['Nombre Central Infotécnica', 'Vertimientos [GWh]', 'Spread Día-Noche', 'Upside_Económico_Anual_USD']].head(10))
 
             # Limpiar datos para el ranking (eliminar NaN o infinitos)
             df_bess_clean = df_bess.dropna(subset=['Upside_Económico_Anual_USD', 'BESS_Potencia_MW'])
