@@ -134,8 +134,24 @@ else:
     
     if central_sel == "Todas":
         # Slider de potencia base
-        min_pot, max_pot = float(df_por_ano['Potencia máxima bruta Central [MW]'].min()), float(df_por_ano['Potencia máxima bruta Central [MW]'].max())
-        potencia_rango = st.sidebar.slider("Rango de Potencia [MW]", min_value=min_pot, max_value=max_pot, value=(min_pot, max_pot))
+        min_pot = float(df_por_ano['Potencia máxima bruta Central [MW]'].min())
+        max_pot = float(df_por_ano['Potencia máxima bruta Central [MW]'].max())
+        
+        # --- NUEVO: Valores por defecto seguros ---
+        # Se intentará usar 20.0 y 200.0, pero si la base de datos tiene otros límites, se adaptará para no lanzar error
+        val_min_defecto = 20.0 if min_pot <= 20.0 <= max_pot else min_pot
+        val_max_defecto = 200.0 if min_pot <= 200.0 <= max_pot else max_pot
+        
+        # Validación por si el mínimo por defecto queda mayor al máximo (casos raros de datos)
+        if val_min_defecto > val_max_defecto:
+            val_min_defecto, val_max_defecto = min_pot, max_pot
+        
+        potencia_rango = st.sidebar.slider(
+            "Rango de Potencia [MW]", 
+            min_value=min_pot, 
+            max_value=max_pot, 
+            value=(val_min_defecto, val_max_defecto)
+        )
         mask = df_por_ano['Potencia máxima bruta Central [MW]'].between(potencia_rango[0], potencia_rango[1])
         df_plot = df_por_ano[mask]
     else:
