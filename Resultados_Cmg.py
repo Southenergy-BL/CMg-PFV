@@ -77,7 +77,7 @@ def load_data_multiaño():
 def load_ranking_data():
     try:
         # Prioriza leer el CSV como lo subiste
-        df = pd.read_csv("BD Centrales - Extra.xlsx - Ranking PFV.csv")
+        df = pd.read_csv("BD Centrales - Extra.csv")
     except FileNotFoundError:
         try:
             # Fallback a Excel si está en tu local
