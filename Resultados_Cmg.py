@@ -21,7 +21,9 @@ columnas_numericas = [
     'CMg promedio solar', 
     'CMg promedio noche', 
     'Porcentaje iny. costo cero',
-    'Potencia máxima bruta Central [MW]'
+    'Potencia máxima bruta Central [MW]',
+    'Vertimientos [GWh]',
+    'Vertimientos [%]'
 ]
 
 # 2. Cargar y procesar datos multi-año con caché
