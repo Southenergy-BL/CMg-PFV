@@ -219,6 +219,69 @@ else:
             fig2.update_layout(showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
 
+    # --- MÓDULO DE PRE-FACTIBILIDAD BESS ---
+st.markdown("---")
+st.subheader("🔋 Evaluación de Pre-Factibilidad: Integración BESS")
+
+with st.expander("Ver Análisis de Almacenamiento (Basado en Vertimientos Anuales)"):
+    st.info(
+        "Este cálculo es un screening de primer nivel. Asume 1 ciclo diario perfecto "
+        "y un dimensionamiento de 4 horas para trasladar la energía vertida hacia el bloque nocturno."
+    )
+    
+    # Verificar que existan las columnas necesarias
+    if 'Vertimientos [GWh]' in df_plot.columns and 'Spread Día-Noche' in df_plot.columns:
+        
+        # Crear copia para no alterar el df principal
+        df_bess = df_plot.copy()
+        
+        # Cálculos BESS
+        df_bess['BESS_Capacidad_MWh'] = (df_bess['Vertimientos [GWh]'] * 1000) / 365
+        df_bess['BESS_Potencia_MW'] = df_bess['BESS_Capacidad_MWh'] / 4
+        df_bess['Upside_Económico_Anual_USD'] = df_bess['Vertimientos [GWh]'] * 1000 * df_bess['Spread Día-Noche']
+        
+        # CASO A: Central Específica
+        if central_sel != "Todas":
+            row_bess = df_bess.iloc[0]
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Potencia BESS Sugerida", f"{formato_chileno(row_bess['BESS_Potencia_MW'])} MW")
+            with col2:
+                st.metric("Capacidad BESS (4h)", f"{formato_chileno(row_bess['BESS_Capacidad_MWh'])} MWh")
+            with col3:
+                st.metric("Upside Teórico (Ingreso Extra)", f"$ {formato_chileno(row_bess['Upside_Económico_Anual_USD'])} / año")
+                
+        # CASO B: Todas las Centrales (Ranking)
+        else:
+            # Limpiar datos para el ranking (eliminar NaN o infinitos)
+            df_bess_clean = df_bess.dropna(subset=['Upside_Económico_Anual_USD', 'BESS_Potencia_MW'])
+            
+            if not df_bess_clean.empty:
+                # Top 10 plantas con mayor potencial económico
+                top_bess = df_bess_clean.sort_values(by='Upside_Económico_Anual_USD', ascending=False).head(10)
+                
+                st.markdown("**Top 10 Centrales con Mayor Potencial para BESS**")
+                
+                fig_bess = px.bar(
+                    top_bess,
+                    x='Nombre Central Infotécnica',
+                    y='Upside_Económico_Anual_USD',
+                    color='BESS_Potencia_MW',
+                    labels={
+                        'Upside_Económico_Anual_USD': 'Ingreso Teórico (USD/Año)',
+                        'BESS_Potencia_MW': 'Tamaño BESS (MW)',
+                        'Nombre Central Infotécnica': 'Central'
+                    },
+                    color_continuous_scale='Viridis',
+                    template='plotly_white'
+                )
+                st.plotly_chart(fig_bess, use_container_width=True)
+            else:
+                st.warning("No hay suficientes datos válidos para generar el ranking BESS en la selección actual.")
+    else:
+        st.error("⚠️ Faltan las columnas 'Vertimientos [GWh]' o 'Spread Día-Noche' en la base de datos para realizar este cálculo.")
+
     # --- TABLA DE DATOS DETALLADA (Aplica a ambos casos) ---
     st.markdown("### Detalle Olas de Datos Filtrados")
     df_mostrar = df_plot.copy()
