@@ -56,11 +56,13 @@ def load_data_multiaño():
     # Concatenar todos los años cargados
     df_completo = pd.concat(dfs_años, ignore_index=True)
     
-    # Limpieza y conversión numérica
+    # Limpieza y conversión numérica (VERSIÓN CORREGIDA)
     for col in columnas_numericas:
         if col in df_completo.columns:
             if df_completo[col].dtype == object:
-                df_completo[col] = df_completo[col].astype(str).str.replace(',', '.')
+                # 1. Quitar el punto de los miles
+                # 2. Cambiar la coma decimal por punto
+                df_completo[col] = df_completo[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
             df_completo[col] = pd.to_numeric(df_completo[col], errors='coerce')
     
     # Eliminar filas sin potencia válida
@@ -269,6 +271,10 @@ with st.expander("Ver Análisis de Almacenamiento (Basado en Vertimientos Anuale
         # CASO B: Todas las Centrales (Ranking)
         else:
             # Limpiar datos para el ranking (eliminar NaN o infinitos)
+            # Inyectar para diagnóstico visual temporal
+            st.write("🔍 DEBUG - Estado de los datos antes del dropna:")
+            st.dataframe(df_bess[['Nombre Central Infotécnica', 'Vertimientos [GWh]', 'Spread Día-Noche', 'Upside_Económico_Anual_USD']].head(10))
+
             df_bess_clean = df_bess.dropna(subset=['Upside_Económico_Anual_USD', 'BESS_Potencia_MW'])
             
             if not df_bess_clean.empty:
