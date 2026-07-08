@@ -59,11 +59,25 @@ def load_data_multiaño():
         
     df_completo = pd.concat(dfs_años, ignore_index=True)
     
-    # Limpieza estricta de números (manejo de puntos de miles y comas decimales)
+    # Limpieza estricta de números (manejo inteligente de formatos mixtos)
     for col in columnas_numericas:
         if col in df_completo.columns:
             if df_completo[col].dtype == object:
-                df_completo[col] = df_completo[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                def limpiar_numero(x):
+                    x = str(x).strip()
+                    # Si tiene punto y coma, vemos cuál es el decimal (el que está a la derecha)
+                    if '.' in x and ',' in x:
+                        if x.rfind(',') > x.rfind('.'):  # Formato chileno: 1.250,50
+                            return x.replace('.', '').replace(',', '.')
+                        else:  # Formato gringo: 1,250.50
+                            return x.replace(',', '')
+                    # Si solo tiene coma, asumimos que es decimal (ej: 1,5)
+                    elif ',' in x:
+                        return x.replace(',', '.')
+                    # Si solo tiene punto (ej: 1.5) o es texto, se deja tal cual
+                    return x
+                    
+                df_completo[col] = df_completo[col].apply(limpiar_numero)
             df_completo[col] = pd.to_numeric(df_completo[col], errors='coerce')
     
     df_completo = df_completo.dropna(subset=['Potencia máxima bruta Central [MW]'])
@@ -77,7 +91,7 @@ def load_data_multiaño():
 def load_ranking_data():
     try:
         # Prioriza leer el CSV como lo subiste
-        df = pd.read_csv("BD Centrales - Extra.csv")
+        df = pd.read_csv("BD Centrales - Extra.xlsx - Ranking PFV.csv")
     except FileNotFoundError:
         try:
             # Fallback a Excel si está en tu local
