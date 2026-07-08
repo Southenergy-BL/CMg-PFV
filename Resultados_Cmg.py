@@ -219,7 +219,19 @@ else:
             fig2.update_layout(showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
 
-    # --- MÓDULO DE PRE-FACTIBILIDAD BESS ---
+    # --- TABLA DE DATOS DETALLADA (Aplica a ambos casos) ---
+    st.markdown("### Detalle Olas de Datos Filtrados")
+    df_mostrar = df_plot.copy()
+    
+    # Columnas a formatear visualmente
+    columnas_a_formatear = columnas_numericas + ['Eficiencia de Captura (%)', 'Spread Día-Noche']
+    for col in columnas_a_formatear:
+        if col in df_mostrar.columns:
+            df_mostrar[col] = df_mostrar[col].apply(lambda x: formato_chileno(x) if pd.notnull(x) else x)
+            
+    st.dataframe(df_mostrar, use_container_width=True)
+
+        # --- MÓDULO DE PRE-FACTIBILIDAD BESS ---
 st.markdown("---")
 st.subheader("🔋 Evaluación de Pre-Factibilidad: Integración BESS")
 
@@ -281,15 +293,3 @@ with st.expander("Ver Análisis de Almacenamiento (Basado en Vertimientos Anuale
                 st.warning("No hay suficientes datos válidos para generar el ranking BESS en la selección actual.")
     else:
         st.error("⚠️ Faltan las columnas 'Vertimientos [GWh]' o 'Spread Día-Noche' en la base de datos para realizar este cálculo.")
-
-    # --- TABLA DE DATOS DETALLADA (Aplica a ambos casos) ---
-    st.markdown("### Detalle Olas de Datos Filtrados")
-    df_mostrar = df_plot.copy()
-    
-    # Columnas a formatear visualmente
-    columnas_a_formatear = columnas_numericas + ['Eficiencia de Captura (%)', 'Spread Día-Noche']
-    for col in columnas_a_formatear:
-        if col in df_mostrar.columns:
-            df_mostrar[col] = df_mostrar[col].apply(lambda x: formato_chileno(x) if pd.notnull(x) else x)
-            
-    st.dataframe(df_mostrar, use_container_width=True)
