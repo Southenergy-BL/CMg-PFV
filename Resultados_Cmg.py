@@ -355,7 +355,7 @@ else:
                 graficar_scatter_dinamico(
                     df_ranking, 
                     'Score Técnico Promedio 2025', 
-                    'Score Comercial 2025', 
+                    'Score Comercial Promedio 2025', 
                     "Técnico vs Score Comercial (2025)"
                 )
                 
