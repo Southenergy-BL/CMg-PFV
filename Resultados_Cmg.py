@@ -99,9 +99,9 @@ def load_ranking_data():
         except FileNotFoundError:
             return pd.DataFrame()
             
-    # Limpieza del dataframe de rankings (Añadido Score Técnico Promedio 2025)
+    # Limpieza del dataframe de rankings (Actualizado con Score Técnico 2025)
     columnas_ranking = [
-        'Score Técnico Promedio 2025',
+        'Score Técnico 2025',
         'Score Técnico Promedio', 
         'PPA mínimo 2025 [USD/MWh]', 
         'PPA mínimo Promedio [USD/MWh]', 
@@ -114,6 +114,10 @@ def load_ranking_data():
             # Reemplaza los '-' por NaN reales y procesa strings
             df[c] = df[c].astype(str).replace('-', pd.NA).str.replace(',', '.')
             df[c] = pd.to_numeric(df[c], errors='coerce')
+            
+    # Limpieza específica para la columna categórica de BESS
+    if '¿Tiene BESS?' in df.columns:
+        df['¿Tiene BESS?'] = df['¿Tiene BESS?'].astype(str).replace('-', 'No').replace('nan', 'No').fillna('No')
             
     return df
 
@@ -304,24 +308,41 @@ else:
                 else:
                     validos['Info_Hover'] = validos[nombre_col_planta]
                 
+                # Definir columnas de agrupación (Incluir BESS para que separe colores)
+                groupby_cols = [x_col, y_col]
+                tiene_bess = '¿Tiene BESS?' in validos.columns
+                if tiene_bess:
+                    groupby_cols.append('¿Tiene BESS?')
+                
                 # 2. Agrupar por coordenadas (esto hace crecer la burbuja y junta los nombres)
-                agrupado = validos.groupby([x_col, y_col]).agg(
+                agrupado = validos.groupby(groupby_cols).agg(
                     Lista_Centrales=('Info_Hover', lambda x: '<br>'.join(x)),
                     Cantidad_Plantas=('Info_Hover', 'count')
                 ).reset_index()
                 
-                # 3. Construir el gráfico Plotly
-                fig = px.scatter(
-                    agrupado,
-                    x=x_col,
-                    y=y_col,
-                    size='Cantidad_Plantas',
-                    hover_name='Lista_Centrales',
-                    title=titulo,
-                    template='plotly_white',
-                    size_max=30, # Tamaño máximo de la burbuja
-                    color_discrete_sequence=['#1f77b4']
-                )
+                # 3. Construir parámetros para Plotly
+                fig_kwargs = {
+                    "x": x_col,
+                    "y": y_col,
+                    "size": 'Cantidad_Plantas',
+                    "hover_name": 'Lista_Centrales',
+                    "title": titulo,
+                    "template": 'plotly_white',
+                    "size_max": 30
+                }
+                
+                # Aplicar lógica de colores BESS si existe la columna
+                if tiene_bess:
+                    fig_kwargs['color'] = '¿Tiene BESS?'
+                    fig_kwargs['color_discrete_map'] = {
+                        'Existente': '#2ca02c',     # Verde para centrales con BESS operando
+                        'Construcción': '#ff7f0e',  # Naranja para las que están en obras
+                        'No': '#1f77b4'             # Azul por defecto para el resto
+                    }
+                else:
+                    fig_kwargs['color_discrete_sequence'] = ['#1f77b4']
+                
+                fig = px.scatter(agrupado, **fig_kwargs)
                 
                 # 4. Mejorar el Tooltip (Al pasar el cursor)
                 fig.update_traces(
@@ -342,19 +363,19 @@ else:
             col_rank1, col_rank2 = st.columns(2)
             
             with col_rank1:
-                # Modificado X -> Score Técnico Promedio 2025
+                # Modificado X -> Score Técnico 2025
                 graficar_scatter_dinamico(
                     df_ranking, 
-                    'Score Técnico Promedio 2025', 
+                    'Score Técnico 2025', 
                     'PPA mínimo 2025 [USD/MWh]', 
                     "Técnico vs PPA Mínimo (2025)"
                 )
                 st.divider()
                 
-                # Modificado X -> Score Técnico Promedio 2025
+                # Modificado X -> Score Técnico 2025
                 graficar_scatter_dinamico(
                     df_ranking, 
-                    'Score Técnico Promedio 2025', 
+                    'Score Técnico 2025', 
                     'Score Comercial 2025', 
                     "Técnico vs Score Comercial (2025)"
                 )
