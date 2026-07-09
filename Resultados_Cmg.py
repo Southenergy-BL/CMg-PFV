@@ -86,7 +86,7 @@ def load_data_multiaño():
     
     return df_completo
 
-# Cargar Datos de Ranking (Tu nuevo archivo Excel/CSV)
+# Cargar Datos de Ranking
 @st.cache_data
 def load_ranking_data():
     try:
@@ -99,8 +99,9 @@ def load_ranking_data():
         except FileNotFoundError:
             return pd.DataFrame()
             
-    # Limpieza del dataframe de rankings
+    # Limpieza del dataframe de rankings (Añadido Score Técnico Promedio 2025)
     columnas_ranking = [
+        'Score Técnico Promedio 2025',
         'Score Técnico Promedio', 
         'PPA mínimo 2025 [USD/MWh]', 
         'PPA mínimo Promedio [USD/MWh]', 
@@ -137,12 +138,10 @@ else:
         min_pot = float(df_por_ano['Potencia máxima bruta Central [MW]'].min())
         max_pot = float(df_por_ano['Potencia máxima bruta Central [MW]'].max())
         
-        # --- NUEVO: Valores por defecto seguros ---
-        # Se intentará usar 20.0 y 200.0, pero si la base de datos tiene otros límites, se adaptará para no lanzar error
+        # Valores por defecto seguros
         val_min_defecto = 20.0 if min_pot <= 20.0 <= max_pot else min_pot
         val_max_defecto = 200.0 if min_pot <= 200.0 <= max_pot else max_pot
         
-        # Validación por si el mínimo por defecto queda mayor al máximo (casos raros de datos)
         if val_min_defecto > val_max_defecto:
             val_min_defecto, val_max_defecto = min_pot, max_pot
         
@@ -170,7 +169,7 @@ else:
     tab1, tab2, tab3 = st.tabs(["📊 Análisis CMg", "🔋 Evaluación BESS", "🏆 Ranking y Scores"])
 
     # =========================================================================
-    # TAB 1: ANÁLISIS DE MERCADO Y CMG (Tu código original)
+    # TAB 1: ANÁLISIS DE MERCADO Y CMG
     # =========================================================================
     with tab1:
         if central_sel != "Todas" and not df_plot.empty:
@@ -212,9 +211,8 @@ else:
                 fig2.update_layout(showlegend=False)
                 st.plotly_chart(fig2, use_container_width=True)
 
-
     # =========================================================================
-    # TAB 2: MÓDULO BESS (Sensibilidad y Multi-Año)
+    # TAB 2: MÓDULO BESS
     # =========================================================================
     with tab2:
         st.subheader("🔋 Evaluación de Pre-Factibilidad: Integración BESS")
@@ -278,15 +276,20 @@ else:
     # =========================================================================
     with tab3:
         st.subheader("🏆 Análisis de Scores: Técnico vs Comercial y PPA")
-        st.markdown("Visualización de las evaluaciones. El tamaño del círculo indica plantas que empatan en exactamente la misma coordenada.")
+        st.markdown("Visualización de las evaluaciones. El tamaño del círculo indica plantas que empatan en la misma coordenada.")
         
         if df_ranking.empty:
-            st.error("⚠️ No se pudo cargar el archivo 'BD Centrales - Extra.xlsx - Ranking PFV.csv'. Asegúrate de que está en la misma carpeta.")
+            st.error("⚠️ No se pudo cargar el archivo de Ranking. Asegúrate de que está en la misma carpeta.")
         else:
             nombre_col_planta = df_ranking.columns[0] # Asume que la 1ra col es el nombre de la planta
             
             # Función maestra para crear el gráfico scatter agrupado y manejar los nulos
             def graficar_scatter_dinamico(df, x_col, y_col, titulo):
+                # Validar que las columnas existan en el dataframe
+                if x_col not in df.columns or y_col not in df.columns:
+                    st.warning(f"Faltan datos para: {titulo}. Columnas no encontradas.")
+                    return
+                
                 # 1. Separar datos válidos de nulos
                 validos = df.dropna(subset=[x_col, y_col]).copy()
                 faltantes = df[df[x_col].isna() | df[y_col].isna()][nombre_col_planta].tolist()
@@ -295,10 +298,16 @@ else:
                     st.warning(f"No hay datos para renderizar: {titulo}")
                     return
                 
+                # Incorporar nombre del Propietario/Coordinado al Tooltip si existe
+                if 'Propietario' in validos.columns:
+                    validos['Info_Hover'] = validos[nombre_col_planta] + " (" + validos['Propietario'].astype(str) + ")"
+                else:
+                    validos['Info_Hover'] = validos[nombre_col_planta]
+                
                 # 2. Agrupar por coordenadas (esto hace crecer la burbuja y junta los nombres)
                 agrupado = validos.groupby([x_col, y_col]).agg(
-                    Lista_Centrales=(nombre_col_planta, lambda x: '<br>'.join(x)),
-                    Cantidad_Plantas=(nombre_col_planta, 'count')
+                    Lista_Centrales=('Info_Hover', lambda x: '<br>'.join(x)),
+                    Cantidad_Plantas=('Info_Hover', 'count')
                 ).reset_index()
                 
                 # 3. Construir el gráfico Plotly
@@ -316,10 +325,10 @@ else:
                 
                 # 4. Mejorar el Tooltip (Al pasar el cursor)
                 fig.update_traces(
-                    hovertemplate="<b>Central(es):</b><br>%{hovertext}<br><br>" +
+                    hovertemplate="<b>Central(es) y Coordinado:</b><br>%{hovertext}<br><br>" +
                                   "<b>" + x_col + ":</b> %{x}<br>" +
                                   "<b>" + y_col + ":</b> %{y}<br>" +
-                                  "<b>Empates:</b> %{marker.size}<extra></extra>"
+                                  "<b>Total Empates:</b> %{marker.size}<extra></extra>"
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
@@ -333,21 +342,25 @@ else:
             col_rank1, col_rank2 = st.columns(2)
             
             with col_rank1:
+                # Modificado X -> Score Técnico Promedio 2025
                 graficar_scatter_dinamico(
                     df_ranking, 
-                    'Score Técnico Promedio', 
+                    'Score Técnico Promedio 2025', 
                     'PPA mínimo 2025 [USD/MWh]', 
                     "Técnico vs PPA Mínimo (2025)"
                 )
                 st.divider()
+                
+                # Modificado X -> Score Técnico Promedio 2025
                 graficar_scatter_dinamico(
                     df_ranking, 
-                    'Score Técnico Promedio', 
+                    'Score Técnico Promedio 2025', 
                     'Score Comercial 2025', 
                     "Técnico vs Score Comercial (2025)"
                 )
                 
             with col_rank2:
+                # Mantiene el Promedio Histórico
                 graficar_scatter_dinamico(
                     df_ranking, 
                     'Score Técnico Promedio', 
@@ -355,6 +368,8 @@ else:
                     "Técnico vs PPA Mínimo (Promedio)"
                 )
                 st.divider()
+                
+                # Mantiene el Promedio Histórico
                 graficar_scatter_dinamico(
                     df_ranking, 
                     'Score Técnico Promedio', 
