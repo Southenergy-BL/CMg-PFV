@@ -12,9 +12,9 @@ def formato_chileno(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 st.title("⚡ Dashboard Interactivo: Análisis de Centrales Fotovoltaicas (PFV)")
-st.markdown("Análisis de Costos Marginales, Factibilidad BESS y Ranking de Mercado.")
+st.markdown("Análisis de Costos Marginales, Factibilidad BESS, Ranking de Mercado y Estados Operativos.")
 
-# Definición global de columnas numéricas (Actualizada con vertimientos)
+# Definición global de columnas numéricas
 columnas_numericas = [
     'CMg precio captura', 
     'CMg promedio horario', 
@@ -29,7 +29,6 @@ columnas_numericas = [
 # 2. Cargar y procesar datos multi-año
 @st.cache_data
 def load_data_multiaño():
-    # Intenta cargar el archivo principal
     ruta_archivo = "BD Centrales.xlsx" 
     años = [2023, 2024, 2025]
     dfs_años = []
@@ -43,9 +42,8 @@ def load_data_multiaño():
                 df_filtrado['Año'] = ano
                 dfs_años.append(df_filtrado)
             except Exception:
-                continue # Pasa al siguiente año si la hoja no existe
+                continue 
     except Exception:
-        # Fallback si quieres usar el CSV de prueba subido para 2025
         try:
             df_ano = pd.read_csv("BD Centrales ejemplo.xlsx - BD Centrales 2025.csv")
             df_filtrado = df_ano[df_ano['Nombre Central Infotécnica'].str.startswith('PFV', na=False)].copy()
@@ -59,22 +57,18 @@ def load_data_multiaño():
         
     df_completo = pd.concat(dfs_años, ignore_index=True)
     
-    # Limpieza estricta de números (manejo inteligente de formatos mixtos)
     for col in columnas_numericas:
         if col in df_completo.columns:
             if df_completo[col].dtype == object:
                 def limpiar_numero(x):
                     x = str(x).strip()
-                    # Si tiene punto y coma, vemos cuál es el decimal (el que está a la derecha)
                     if '.' in x and ',' in x:
-                        if x.rfind(',') > x.rfind('.'):  # Formato chileno: 1.250,50
+                        if x.rfind(',') > x.rfind('.'):  
                             return x.replace('.', '').replace(',', '.')
-                        else:  # Formato gringo: 1,250.50
+                        else:  
                             return x.replace(',', '')
-                    # Si solo tiene coma, asumimos que es decimal (ej: 1,5)
                     elif ',' in x:
                         return x.replace(',', '.')
-                    # Si solo tiene punto (ej: 1.5) o es texto, se deja tal cual
                     return x
                     
                 df_completo[col] = df_completo[col].apply(limpiar_numero)
@@ -90,16 +84,13 @@ def load_data_multiaño():
 @st.cache_data
 def load_ranking_data():
     try:
-        # Prioriza leer el CSV como lo subiste
         df = pd.read_csv("BD Centrales - Extra.xlsx - Ranking PFV.csv")
     except FileNotFoundError:
         try:
-            # Fallback a Excel si está en tu local
             df = pd.read_excel("BD Centrales - Extra.xlsx", sheet_name="Ranking PFV")
         except FileNotFoundError:
             return pd.DataFrame()
             
-    # Limpieza del dataframe de rankings (Actualizado con Score Técnico 2025)
     columnas_ranking = [
         'Score Técnico 2025',
         'Score Técnico Promedio', 
@@ -111,19 +102,39 @@ def load_ranking_data():
     
     for c in columnas_ranking:
         if c in df.columns:
-            # Reemplaza los '-' por NaN reales y procesa strings
             df[c] = df[c].astype(str).replace('-', pd.NA).str.replace(',', '.')
             df[c] = pd.to_numeric(df[c], errors='coerce')
             
-    # Limpieza específica para la columna categórica de BESS
     if '¿Tiene BESS?' in df.columns:
         df['¿Tiene BESS?'] = df['¿Tiene BESS?'].astype(str).replace('-', 'No').replace('nan', 'No').fillna('No')
             
     return df
 
+# --- NUEVO: Cargar datos consolidados de estados operativos ---
+@st.cache_data
+def load_consolidados_data():
+    try:
+        # 1. Cargar el CSV (con el separador correcto que encontramos antes)
+        df = pd.read_csv("consolidados_2026-08-18_15_58_31.csv")
+        
+        # 2. LIMPIEZA DE LA COLUMNA DURACIÓN
+        if 'duracion' in df.columns:
+            # Reemplazamos las comas por puntos (por si vienen con formato chileno)
+            df['duracion'] = df['duracion'].astype(str).str.replace(',', '.')
+            # Convertimos explícitamente a número, ignorando textos extraños
+            df['duracion'] = pd.to_numeric(df['duracion'], errors='coerce')
+            
+        return df
+    except FileNotFoundError:
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error al leer el CSV de consolidados: {e}")
+        return pd.DataFrame()
+
 # Ejecutar cargas
 df_pfv = load_data_multiaño()
 df_ranking = load_ranking_data()
+df_consolidados = load_consolidados_data() # NUEVO
 
 if df_pfv.empty:
     st.error("No se encontraron los datos principales (CMg). Verifica los nombres de los archivos.")
@@ -138,11 +149,9 @@ else:
     central_sel = st.sidebar.selectbox("Consultar Central Específica", centrales_disponibles)
     
     if central_sel == "Todas":
-        # Slider de potencia base
         min_pot = float(df_por_ano['Potencia máxima bruta Central [MW]'].min())
         max_pot = float(df_por_ano['Potencia máxima bruta Central [MW]'].max())
         
-        # Valores por defecto seguros
         val_min_defecto = 20.0 if min_pot <= 20.0 <= max_pot else min_pot
         val_max_defecto = 200.0 if min_pot <= 200.0 <= max_pot else max_pot
         
@@ -160,7 +169,6 @@ else:
     else:
         df_plot = df_por_ano[df_por_ano['Nombre Central Infotécnica'] == central_sel]
 
-    # --- NUEVO: FILTROS PARA BESS ---
     st.sidebar.divider()
     st.sidebar.header("⚙️ Configuración BESS")
     horas_bess = st.sidebar.slider(
@@ -169,8 +177,8 @@ else:
         help="Define las horas de descarga para dimensionar el inversor."
     )
 
-    # --- ORGANIZACIÓN EN PESTAÑAS ---
-    tab1, tab2, tab3 = st.tabs(["📊 Análisis CMg", "🔋 Evaluación BESS", "🏆 Ranking y Scores"])
+    # --- ORGANIZACIÓN EN PESTAÑAS (Modificado para incluir Tab 4) ---
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Análisis CMg", "🔋 Evaluación BESS", "🏆 Ranking y Scores", "⏱️ Estados Operativos"])
 
     # =========================================================================
     # TAB 1: ANÁLISIS DE MERCADO Y CMG
@@ -229,7 +237,6 @@ else:
             else:
                 df_bess_base = df_plot.copy()
                 
-            # Cálculos BESS Dinámicos
             df_bess_base['BESS_Capacidad_MWh'] = (df_bess_base['Vertimientos [GWh]'] * 1000) / 365
             df_bess_base['BESS_Potencia_MW'] = df_bess_base['BESS_Capacidad_MWh'] / horas_bess
             df_bess_base['Upside_Económico_Anual_USD'] = df_bess_base['Vertimientos [GWh]'] * 1000 * df_bess_base['Spread Día-Noche']
@@ -274,7 +281,6 @@ else:
         else:
             st.error("⚠️ Faltan las columnas de Vertimientos o Spread para este cálculo.")
 
-
     # =========================================================================
     # TAB 3: RANKING Y SCORES (SCATTER PLOTS)
     # =========================================================================
@@ -285,16 +291,13 @@ else:
         if df_ranking.empty:
             st.error("⚠️ No se pudo cargar el archivo de Ranking. Asegúrate de que está en la misma carpeta.")
         else:
-            nombre_col_planta = df_ranking.columns[0] # Asume que la 1ra col es el nombre de la planta
+            nombre_col_planta = df_ranking.columns[0]
             
-            # Función maestra para crear el gráfico scatter agrupado y manejar los nulos
             def graficar_scatter_dinamico(df, x_col, y_col, titulo):
-                # Validar que las columnas existan en el dataframe
                 if x_col not in df.columns or y_col not in df.columns:
                     st.warning(f"Faltan datos para: {titulo}. Columnas no encontradas.")
                     return
                 
-                # 1. Separar datos válidos de nulos
                 validos = df.dropna(subset=[x_col, y_col]).copy()
                 faltantes = df[df[x_col].isna() | df[y_col].isna()][nombre_col_planta].tolist()
                 
@@ -302,25 +305,21 @@ else:
                     st.warning(f"No hay datos para renderizar: {titulo}")
                     return
                 
-                # Incorporar nombre del Propietario/Coordinado al Tooltip si existe
                 if 'Propietario' in validos.columns:
                     validos['Info_Hover'] = validos[nombre_col_planta] + " (" + validos['Propietario'].astype(str) + ")"
                 else:
                     validos['Info_Hover'] = validos[nombre_col_planta]
                 
-                # Definir columnas de agrupación (Incluir BESS para que separe colores)
                 groupby_cols = [x_col, y_col]
                 tiene_bess = '¿Tiene BESS?' in validos.columns
                 if tiene_bess:
                     groupby_cols.append('¿Tiene BESS?')
                 
-                # 2. Agrupar por coordenadas (esto hace crecer la burbuja y junta los nombres)
                 agrupado = validos.groupby(groupby_cols).agg(
                     Lista_Centrales=('Info_Hover', lambda x: '<br>'.join(x)),
                     Cantidad_Plantas=('Info_Hover', 'count')
                 ).reset_index()
                 
-                # 3. Construir parámetros para Plotly
                 fig_kwargs = {
                     "x": x_col,
                     "y": y_col,
@@ -331,22 +330,20 @@ else:
                     "size_max": 30
                 }
                 
-                # Aplicar lógica de colores BESS si existe la columna
                 if tiene_bess:
                     fig_kwargs['color'] = '¿Tiene BESS?'
                     fig_kwargs['color_discrete_map'] = {
-                        'Existente': '#2ca02c',     # Verde para centrales con BESS operando
-                        'Construcción': '#ff7f0e',  # Naranja para las que están en obras
-                        'Autorizado Construcción': "#ff0e0e",  # Naranja para las que están en obras
-                        'Proceso SAC': "#c713cd",  # Rojo para las que están en proceso de autorización
-                        'No': '#1f77b4'             # Azul por defecto para el resto
+                        'Existente': '#2ca02c',     
+                        'Construcción': '#ff7f0e',  
+                        'Autorizado Construcción': "#ff0e0e",  
+                        'Proceso SAC': "#c713cd",  
+                        'No': '#1f77b4'             
                     }
                 else:
                     fig_kwargs['color_discrete_sequence'] = ['#1f77b4']
                 
                 fig = px.scatter(agrupado, opacity=0.6, **fig_kwargs)
                 
-                # 4. Mejorar el Tooltip (Al pasar el cursor)
                 fig.update_traces(
                     hovertemplate="<b>Central(es) y Coordinado:</b><br>%{hovertext}<br><br>" +
                                   "<b>" + x_col + ":</b> %{x}<br>" +
@@ -356,46 +353,104 @@ else:
                 
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # 5. Trazabilidad: Expander para mencionar centrales sin datos
                 if faltantes:
                     with st.expander(f"⚠️ {len(faltantes)} centrales sin score para graficar en este panel"):
                         st.write(", ".join(faltantes))
 
-            # Matriz de 2x2 para acomodar los 4 gráficos solicitados
             col_rank1, col_rank2 = st.columns(2)
             
             with col_rank1:
-                # Modificado X -> Score Técnico 2025
-                graficar_scatter_dinamico(
-                    df_ranking, 
-                    'Score Técnico 2025', 
-                    'PPA mínimo 2025 [USD/MWh]', 
-                    "Técnico vs PPA Mínimo (2025)"
-                )
+                graficar_scatter_dinamico(df_ranking, 'Score Técnico 2025', 'PPA mínimo 2025 [USD/MWh]', "Técnico vs PPA Mínimo (2025)")
                 st.divider()
-                
-                # Modificado X -> Score Técnico 2025
-                graficar_scatter_dinamico(
-                    df_ranking, 
-                    'Score Técnico 2025', 
-                    'Score Comercial 2025', 
-                    "Técnico vs Score Comercial (2025)"
-                )
+                graficar_scatter_dinamico(df_ranking, 'Score Técnico 2025', 'Score Comercial 2025', "Técnico vs Score Comercial (2025)")
                 
             with col_rank2:
-                # Mantiene el Promedio Histórico
-                graficar_scatter_dinamico(
-                    df_ranking, 
-                    'Score Técnico Promedio', 
-                    'PPA mínimo Promedio [USD/MWh]', 
-                    "Técnico vs PPA Mínimo (Promedio)"
-                )
+                graficar_scatter_dinamico(df_ranking, 'Score Técnico Promedio', 'PPA mínimo Promedio [USD/MWh]', "Técnico vs PPA Mínimo (Promedio)")
                 st.divider()
+                graficar_scatter_dinamico(df_ranking, 'Score Técnico Promedio', 'Score Comercial Promedio', "Técnico vs Score Comercial (Promedio)")
+
+    # =========================================================================
+    # NUEVO: TAB 4: ESTADOS OPERATIVOS (AGRUPADO)
+    # =========================================================================
+    with tab4:
+        st.subheader("⏱️ Análisis de Duración por Estado Operativo")
+        
+        if df_consolidados.empty:
+            st.error("⚠️ No se pudo cargar el archivo de consolidados. Asegúrate de que está en la misma ruta.")
+        else:
+            col_central_consolidados = 'central_nombre' 
+            
+            if col_central_consolidados not in df_consolidados.columns:
+                st.warning(f"La columna '{col_central_consolidados}' no fue encontrada en el archivo.")
+            elif 'estado_operativo_nombre' not in df_consolidados.columns or 'duracion' not in df_consolidados.columns:
+                st.warning("El archivo CSV debe contener las columnas 'estado_operativo_nombre' y 'duracion'.")
+            else:
+                centrales_validas = sorted(list(df_plot['Nombre Central Infotécnica'].unique()))
                 
-                # Mantiene el Promedio Histórico
-                graficar_scatter_dinamico(
-                    df_ranking, 
-                    'Score Técnico Promedio', 
-                    'Score Comercial Promedio', 
-                    "Técnico vs Score Comercial (Promedio)"
-                )
+                if not centrales_validas:
+                    st.info("No hay centrales disponibles bajo los filtros actuales para analizar.")
+                else:
+                    central_analisis = st.selectbox(
+                        "Selecciona la central a visualizar:", 
+                        options=centrales_validas
+                    )
+                    
+                    df_ops_planta = df_consolidados[df_consolidados[col_central_consolidados] == central_analisis].copy()
+                    
+                    if df_ops_planta.empty:
+                        st.info(f"No hay registros de estados operativos en el archivo consolidados para: {central_analisis}")
+                    else:
+                        # 1. Crear el diccionario de mapeo según la Tabla 5.1 de la imagen
+                        diccionario_estados = {
+                            'N': 'Estado Disponible', 'DN': 'Estado Disponible', 'CSE': 'Estado Disponible',
+                            'DP': 'Estado No Disponible', 'DF': 'Estado No Disponible', 'MM': 'Estado No Disponible', 
+                            'PMM': 'Estado No Disponible', 'FE': 'Estado No Disponible',
+                            'LP': 'Estado Deteriorado', 'LF': 'Estado Deteriorado', 'DLP': 'Estado Deteriorado', 
+                            'DLF': 'Estado Deteriorado', 'DRO': 'Estado Deteriorado', 'PO': 'Estado Deteriorado', 
+                            'PDO': 'Estado Deteriorado', 'RO': 'Estado Deteriorado'
+                        }
+                        
+                        # 2. Asignar la categoría principal a cada fila
+                        # Si encuentra un estado que no está en la tabla, lo clasificará como 'Otros'
+                        df_ops_planta['Categoria_Principal'] = df_ops_planta['estado_operativo_nombre'].map(diccionario_estados).fillna('Otros')
+                        
+                        # 3. Agrupar por la categoría principal y el estado específico
+                        df_ops_agrupado = df_ops_planta.groupby(["Categoria_Principal", "estado_operativo_nombre"], as_index=False)["duracion"].sum()
+                        
+                        # Orden visual de las categorías
+                        orden_categorias = ['Estado Disponible', 'Estado Deteriorado', 'Estado No Disponible', 'Otros']
+                        
+                        # 4. Generar histograma (coloreado y agrupado por la nueva categoría)
+                        fig_ops = px.bar(
+                            df_ops_agrupado,
+                            x="estado_operativo_nombre",
+                            y="duracion",
+                            color="Categoria_Principal", 
+                            text="duracion",
+                            title=f"Suma Total de Duraciones por Estado: {central_analisis}",
+                            labels={
+                                "estado_operativo_nombre": "Sigla Estado Operativo",
+                                "duracion": "Duración Total (Horas)",
+                                "Categoria_Principal": "Clasificación"
+                            },
+                            category_orders={"Categoria_Principal": orden_categorias},
+                            template="plotly_white",
+                            color_discrete_map={
+                                'Estado Disponible': '#2ca02c',       # Verde
+                                'Estado Deteriorado': '#ff7f0e',      # Naranja
+                                'Estado No Disponible': '#d62728',    # Rojo
+                                'Otros': '#7f7f7f'                    # Gris
+                            }
+                        )
+                        
+                        # Formato numérico de las etiquetas sobre las barras
+                        fig_ops.update_traces(texttemplate='%{text:,.2f}', textposition='outside')
+                        
+                        # Ajustar el diseño: habilitar leyenda para ver las categorías, y rotar etiquetas del eje X
+                        fig_ops.update_layout(
+                            xaxis_tickangle=-45, 
+                            legend_title_text="Clasificación General",
+                            xaxis={'categoryorder':'category ascending'} # Ordena alfabéticamente las barras en el eje X
+                        )
+                        
+                        st.plotly_chart(fig_ops, use_container_width=True)
