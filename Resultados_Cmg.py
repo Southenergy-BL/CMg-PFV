@@ -351,7 +351,7 @@ else:
                                   "<b>" + y_col + ":</b> %{y}<br>" +
                                   "<b>Total Empates:</b> %{marker.size}<extra></extra>"
                 )
-                
+                fig.update_layout(hovermode="x unified")
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # 5. Trazabilidad: Expander para mencionar centrales sin datos
