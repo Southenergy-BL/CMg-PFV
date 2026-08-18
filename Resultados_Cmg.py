@@ -342,7 +342,7 @@ else:
                 else:
                     fig_kwargs['color_discrete_sequence'] = ['#1f77b4']
                 
-                fig = px.scatter(agrupado, **fig_kwargs)
+                fig = px.scatter(agrupado, opacity=0.6, **fig_kwargs)
                 
                 # 4. Mejorar el Tooltip (Al pasar el cursor)
                 fig.update_traces(
@@ -351,7 +351,7 @@ else:
                                   "<b>" + y_col + ":</b> %{y}<br>" +
                                   "<b>Total Empates:</b> %{marker.size}<extra></extra>"
                 )
-                fig.update_layout(hovermode="x unified")
+                
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # 5. Trazabilidad: Expander para mencionar centrales sin datos
