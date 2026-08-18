@@ -338,6 +338,7 @@ else:
                         'Existente': '#2ca02c',     # Verde para centrales con BESS operando
                         'Construcción': '#ff7f0e',  # Naranja para las que están en obras
                         'Autorizado Construcción': "#ff0e0e",  # Naranja para las que están en obras
+                        'Proceso SAC': "#c713cd",  # Rojo para las que están en proceso de autorización
                         'No': '#1f77b4'             # Azul por defecto para el resto
                     }
                 else:
